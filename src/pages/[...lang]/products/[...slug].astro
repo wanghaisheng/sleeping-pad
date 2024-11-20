@@ -1,0 +1,347 @@
+---
+// Import section components
+import MainLayout from "@/layouts/MainLayout.astro";
+import ProductTabBtn from "@components/ui/buttons/ProductTabBtn.astro";
+import PrimaryCTA from "@components/ui/buttons/PrimaryCTA.astro";
+import { Image } from "astro:assets";
+import { getCollection, type CollectionEntry } from "astro:content";
+import siteconfig from "@data/site.json";
+
+// Type definitions
+interface SiteConfig {
+  supportedLangLabels: {
+    [key: string]: string;
+  };
+  SITE: {
+    title: string;
+    tagline: string;
+    description: string;
+    description_short: string;
+    url: string;
+    author: string;
+  };
+}
+
+interface Props {
+  params: {
+    lang: string;
+    slug: string;
+  };
+  props: {
+    product: CollectionEntry<"products">;
+  };
+}
+
+// Global declaration for gsap animation library
+declare global {
+  interface Window {
+    gsap: any;
+  }
+}
+
+// Language utility functions
+function getLanguageUtils(config: SiteConfig) {
+  return {
+    getSupportedLanguages: () => Object.keys(config.supportedLangLabels),
+    getLanguageLabel: (lang: string) => config.supportedLangLabels[lang],
+    isLanguageSupported: (lang: string) => lang in config.supportedLangLabels,
+    getDefaultLanguage: () => "en",
+  };
+}
+
+// Get static paths for all products in all languages
+export async function getStaticPaths() {
+  const supportedLanguages = Object.keys(siteconfig.supportedLangLabels);
+  
+  const allProducts = await Promise.all(
+    supportedLanguages.map(async (lang) => {
+      const products = await getCollection("products", ({ id }) =>
+        id.startsWith(`${lang}/`)
+      );
+      return products.map((product) => {
+        const slugWithoutLang = product.slug.replace(`${lang}/`, "");
+        return {
+          params: {
+            lang,
+            slug: slugWithoutLang,
+          },
+          props: { 
+            product 
+          },
+        };
+      });
+    })
+  );
+  const fallbackPaths = allProducts.flat().map((product) => ({
+    params: {
+      lang: undefined,
+      slug: product.params.slug,
+    },
+    redirect: `/${siteconfig.defaultlang}/products/${product.params.slug}/`,
+  }));
+  return [...allProducts.flat(), ...fallbackPaths];
+
+  // return allProducts.flat();
+}
+
+
+// Component logic
+const { lang } = Astro.params;
+const currentLang = lang || "en";
+
+// Validate language
+const langUtils = getLanguageUtils(siteconfig as SiteConfig);
+if (!langUtils.isLanguageSupported(currentLang)) {
+  return Astro.redirect(`/${langUtils.getDefaultLanguage()}/404`);
+}
+
+// Get navigation data and product information
+const navlinkData = await import(`../../../data_files/${currentLang}/nav.json`);
+const { product } = Astro.props;
+if (!product) {
+  return Astro.redirect(`/404`);
+}
+console.log('=======',product)
+
+const pageTitle: string = `${product.data.title} | ${siteconfig.SITE.title}`;
+---
+
+<MainLayout
+  navdata={navlinkData}
+  supportedLangLabels={siteconfig.supportedLangLabels}
+  title={pageTitle}
+>
+  <div id="overlay" class="fixed inset-0 bg-neutral-200 dark:bg-neutral-800">
+  </div>
+  
+  <section class="mx-auto flex max-w-[85rem] flex-col px-4 py-10 sm:px-6 lg:px-8 lg:py-14 2xl:max-w-full">
+    <div>
+      <p id="fadeText" class="mb-8 max-w-prose text-pretty font-light text-neutral-700 dark:text-neutral-300 sm:text-xl">
+        {product.data.main.content}
+      </p>
+    </div>
+    
+    <div class="flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
+      <div id="fadeInUp">
+        <h1 class="block text-4xl font-bold tracking-tighter text-neutral-800 dark:text-neutral-200 sm:text-5xl md:text-6xl lg:text-7xl">
+          {product.data.title}
+        </h1>
+        <p class="text-lg text-neutral-600 dark:text-neutral-400">
+          {product.data.description}
+        </p>
+      </div>
+      <div>
+        <Image
+          id="fadeInMoveRight"
+          src={product.data.main.imgMain}
+          class="w-[600px]"
+          alt={product.data.main.imgAlt}
+          format="avif"
+          loading="eager"
+        />
+      </div>
+    </div>
+  </section>
+
+  <div class="mx-auto max-w-[85rem] px-4 pt-10 sm:px-6 lg:px-8 lg:pt-14">
+    <nav class="mx-auto grid max-w-6xl gap-y-px sm:flex sm:gap-x-4 sm:gap-y-0" aria-label="Tabs" role="tablist">
+      {
+        product.data.tabs.map((tab, index) => (
+          <ProductTabBtn
+            title={tab.title}
+            id={tab.id}
+            dataTab={tab.dataTab}
+            first={index === 0}
+          />
+        ))
+      }
+    </nav>
+
+    <div class="mt-12 md:mt-16">
+      <!-- Tab 1 Content -->
+      <div id="tabs-with-card-1" role="tabpanel">
+        <div class="mx-auto max-w-[85rem] px-4 pb-10 sm:px-6 lg:px-8 lg:pb-14">
+          <div class="grid gap-12 md:grid-cols-2">
+            <div class="lg:w-3/4">
+              <h2 class="text-balance text-3xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200 md:leading-tight lg:text-4xl">
+                {product.data.longDescription.title}
+              </h2>
+              <p class="mt-3 text-pretty text-neutral-600 dark:text-neutral-400">
+                {product.data.longDescription.subTitle}
+              </p>
+              <p class="mt-5">
+                <PrimaryCTA
+                  title={product.data.longDescription.btnTitle}
+                  url={product.data.longDescription.btnURL}
+                />
+              </p>
+            </div>
+            <div class="space-y-6 lg:space-y-10">
+              {
+                product.data.descriptionList.map((list) => (
+                  <div class="flex">
+                    <div>
+                      <h3 class="text-base font-bold text-neutral-800 dark:text-neutral-200 sm:text-lg">
+                        {list.title}
+                      </h3>
+                      <p class="mt-1 text-neutral-600 dark:text-neutral-400">
+                        {list.subTitle}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2 Content -->
+      <div id="tabs-with-card-2" class="hidden" role="tabpanel">
+        <!-- ... (rest of tab 2 content) ... -->
+      </div>
+
+      <!-- Tab 3 Content -->
+      <div id="tabs-with-card-3" class="hidden" role="tabpanel">
+        <!-- ... (rest of tab 3 content) ... -->
+      </div>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  import { gsap } from "gsap";
+
+  type AnimationSettings = {
+    autoAlpha?: number;
+    y?: number;
+    x?: number;
+    willChange?: string;
+  };
+
+  function setElementAnimationDefaults(id: string, settings: AnimationSettings) {
+    gsap.set(id, settings);
+  }
+
+  // Set initial states
+  setElementAnimationDefaults("#fadeText", {
+    autoAlpha: 0,
+    y: 50,
+    willChange: "transform, opacity",
+  });
+
+  setElementAnimationDefaults("#fadeInUp", {
+    autoAlpha: 0,
+    y: 50,
+    willChange: "transform, opacity",
+  });
+
+  setElementAnimationDefaults("#fadeInMoveRight", {
+    autoAlpha: 0,
+    x: 300,
+    willChange: "transform, opacity",
+  });
+
+  // Create animation timeline
+  let timeline = gsap.timeline({ defaults: { overwrite: "auto" } });
+
+  timeline.to("#fadeText", {
+    duration: 1.5,
+    autoAlpha: 1,
+    y: 0,
+    delay: 1,
+    ease: "power2.out",
+  });
+
+  timeline.to(
+    "#fadeInUp",
+    { duration: 1.5, autoAlpha: 1, y: 0, ease: "power2.out" },
+    "-=1.2"
+  );
+
+  timeline.to(
+    "#fadeInMoveRight",
+    { duration: 1.5, autoAlpha: 1, x: 0, ease: "power2.inOut" },
+    "-=1.4"
+  );
+
+  timeline.to("#overlay", { duration: 1, autoAlpha: 0, delay: 0.2 });
+</script>
+
+<script>
+  // Tab functionality
+  document.addEventListener("DOMContentLoaded", function () {
+    function setButtonInactive(btn: Element, activeButton: Element) {
+      if (btn !== activeButton) {
+        btn.classList.remove(
+          "active",
+          "bg-neutral-100",
+          "hover:border-transparent",
+          "dark:bg-white/[.05]"
+        );
+        const tabId = btn.getAttribute("data-target");
+        if (tabId) {
+          const contentElement = document.querySelector(tabId);
+          if (contentElement) {
+            contentElement.classList.add("hidden");
+          }
+        }
+        changeHeadingStyle(
+          btn,
+          ["text-neutral-800", "dark:text-neutral-200"],
+          ["text-orange-400", "dark:text-orange-300"]
+        );
+      }
+    }
+
+    function activateButton(button: Element) {
+      button.classList.add(
+        "active",
+        "bg-neutral-100",
+        "hover:border-transparent",
+        "dark:bg-white/[.05]"
+      );
+      const tabId = button.getAttribute("data-target");
+      if (tabId) {
+        const contentElementToShow = document.querySelector(tabId);
+        if (contentElementToShow) {
+          contentElementToShow.classList.remove("hidden");
+        }
+      }
+      changeHeadingStyle(
+        button,
+        ["text-orange-400", "dark:text-orange-300"],
+        ["text-neutral-800", "dark:text-neutral-200"]
+      );
+    }
+
+    function changeHeadingStyle(
+      button: Element,
+      addClasses: string[],
+      removeClasses: string[]
+    ) {
+      const heading = button.querySelector("span");
+      if (heading) {
+        heading.classList.remove(...removeClasses);
+        heading.classList.add(...addClasses);
+      }
+    }
+
+    const tabButtons = document.querySelectorAll("[data-target]");
+    
+    if (tabButtons.length > 0) {
+      changeHeadingStyle(
+        tabButtons[0],
+        ["text-orange-400", "dark:text-orange-300"],
+        []
+      );
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        tabButtons.forEach((btn) => setButtonInactive(btn, button));
+        activateButton(button);
+      });
+    });
+  });
+</script>

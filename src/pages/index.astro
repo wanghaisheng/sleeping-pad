@@ -1,0 +1,19 @@
+---
+// src/pages/[...lang]/index.astro
+
+import { getStaticPaths } from "./[...lang]/index.astro";
+
+// Re-export getStaticPaths to handle the same routes
+export { getStaticPaths };
+
+// Get the language from the URL parameters
+const { lang } = Astro.params;
+
+// Redirect to default language (en) if accessing the root
+export const prerender = false;
+if (!lang) {
+  return Astro.redirect('/en');
+}
+---
+
+<meta http-equiv="refresh" content={`0;url=/${lang || 'en'}`}>
